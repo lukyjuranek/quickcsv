@@ -1,70 +1,23 @@
 #![warn(missing_debug_implementations)]
 
 use std::{env, path::Path, fs::File, error::Error};
-use tabled::{settings::Style};
-// use tabled::assert::assert_table;
-
-fn calculate_column_mean(rows: &[Vec<String>], col_idx: usize) -> f64 {
-    let mut sum = 0.0;
-    let mut count = 0;
-
-    for row in rows {
-        if let Some(value) = row.get(col_idx){
-            match value.parse::<f64>(){
-                Ok(value) => {
-                    sum += value;
-                    count += 1;
-                }
-                Err(_) => {
-                    println!("Error");
-                }
-            }
-        }
-    }
-        
-    let mean = if count > 0 {
-        sum / count as f64
-    } else {
-        0.0
-    };
-    
-    mean
-}
-
-fn calculate_column_median(rows: &[Vec<String>], col_idx: usize) -> Option<f64> {
-    // Extract numeric values from the column
-    let mut values: Vec<f64> = rows
-        .iter()
-        .filter_map(|row| {
-            row.get(col_idx)?
-                .parse::<f64>()
-                .ok()
-        })
-        .collect();
-
-    if values.is_empty() {
-        return None;
-    }
-
-    values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    let len = values.len();
-    let mid = len / 2;
-
-    // Handle even vs odd
-    if len % 2 == 0 {
-        Some((values[mid - 1] + values[mid]) / 2.0)
-    } else {
-        Some(values[mid])
-    }
-}
-
+use tabled::{
+    settings::{Style, 
+        {style::LineText},
+        merge::Merge, Alignment,formatting::Justification, object::Rows, themes::Colorization, Color}
+};
+mod utils;
+use utils::{column_rows, column_nas, column_mean, column_median, column_std};
 
 fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(), Box<dyn Error>>{
     let file = File::open(filename)?;
     let mut rdr = csv::Reader::from_reader(file);
 
     let headers = rdr.headers()?.clone();
+
+    // Add an empty column to headers
+    let mut data_headers: Vec<String> = headers.iter().map(|s| s.to_string()).collect();
+    data_headers.insert(0, String::new());
 
 
     let mut data_rows = Vec::new();
@@ -76,17 +29,22 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
     }
     let mut data_builder = tabled::builder::Builder::default();
     
-    data_builder.push_record(headers.iter());
+    data_builder.push_record(data_headers.iter());
     let max = max_lines.unwrap_or(10);
     for (i, row) in data_rows.iter().enumerate() {
         if i >= max {
             break;
         }
-        data_builder.push_record(row);
+        // Prepend index to each row
+        let mut indexed_row = vec![(i).to_string()];
+        indexed_row.extend(row.iter().cloned());
+        data_builder.push_record(indexed_row);
     }
     
     let data_table = data_builder.build()
         .with(Style::modern())
+        .modify(Rows::first(), Color::BG_BLUE | Color::FG_BLACK)
+        .with(LineText::new("Data", Rows::first()).offset(2))
         .to_string();
     
 
@@ -97,22 +55,61 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
     let mut stats_headers: Vec<String> = headers.iter().map(|s| s.to_string()).collect();
     stats_headers.insert(0, String::new());
 
-    // Mean calculation
+    let rows: Vec<usize> = (0..headers.len())
+        .map(|_|{
+            column_rows(&data_rows)
+        })
+    .collect();
+    
+    let nas: Vec<usize> = (0..headers.len())
+        .map(|col_idx|{
+            column_nas(&data_rows, col_idx)
+        })
+        .collect();
+
     let means: Vec<f64> = (0..headers.len())
         .map(|col_idx|{
-            calculate_column_mean(&data_rows, col_idx)
+            column_mean(&data_rows, col_idx)
         })
         .collect();
 
     let medians: Vec<Option<f64>> = (0..headers.len())
         .map(|col_idx|{
-            calculate_column_median(&data_rows, col_idx)
+            column_median(&data_rows, col_idx)
+        })
+        .collect();
+
+    let std: Vec<f64> = (0..headers.len())
+        .map(|col_idx|{
+            column_std(&data_rows, col_idx)
         })
         .collect();
 
     let mut stats_builder = tabled::builder::Builder::default();
     
     stats_builder.push_record(stats_headers.iter());
+
+
+
+    // Push count
+    stats_builder.push_record({
+        let mut row = vec!["count".to_string()];
+        row.extend(rows.iter().map(|v| format!("{:.3}",v)));
+        row
+    });
+
+    // Push nas 
+    stats_builder.push_record({
+        let mut row = vec!["NaN".to_string()];
+        row.extend(nas.iter().map(|v| {
+            if *v > 0 {
+                format!("{:.3}", v)
+            } else {
+                String::new()
+            }
+        }));
+        row
+    });
 
     // Push means
     stats_builder.push_record({
@@ -131,10 +128,21 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
         row
     });
 
+    // Push standard deviations 
+    stats_builder.push_record({
+        let mut row = vec!["std".to_string()];
+        row.extend(std.iter().map(|v| format!("{:.3}",v)));
+        row
+    });
+
     let stats_table = stats_builder.build()
         .with(Style::modern())
+        .with(Merge::horizontal())
+        .modify(Rows::first(), Color::BG_BLUE | Color::FG_BLACK)
+        //.with(Alignment::center())
+        .with(LineText::new("Stats", Rows::first()).offset(2))
         .to_string();
-
+    
     println!("{}", stats_table);
     println!("{}", data_table);
     
@@ -153,3 +161,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+
+
+
+
+
+
+
