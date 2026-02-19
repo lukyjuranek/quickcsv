@@ -61,8 +61,7 @@ pub fn column_mean(rows: &[Vec<String>], col_idx: usize) -> f64 {
     mean
 }
 
-pub fn column_median(rows: &[Vec<String>], col_idx: usize) -> Option<f64> {
-    // Extract numeric values from the column
+pub fn column_quartiles(rows: &[Vec<String>], col_idx: usize) -> Option<(f64, f64, f64, f64, f64)> {
     let mut values: Vec<f64> = rows
         .iter()
         .filter_map(|row| {
@@ -72,20 +71,22 @@ pub fn column_median(rows: &[Vec<String>], col_idx: usize) -> Option<f64> {
         })
         .collect();
 
-    if values.is_empty() {
-        return None;
-    }
-
     values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
+    
     let len = values.len();
-    let mid = len / 2;
-
-    // Handle even vs odd
-    if len % 2 == 0 {
-        Some((values[mid - 1] + values[mid]) / 2.0)
+    let min = values[0];
+    let max = values[len - 1];
+    
+    let median = if len % 2 == 0 {
+        (values[len / 2 - 1] + values[len / 2]) / 2.0
     } else {
-        Some(values[mid])
-    }
+        values[len / 2]
+    };
+    
+    let q1_pos = len / 4;
+    let q3_pos = (3 * len) / 4;
+    let q1 = values[q1_pos];
+    let q3 = values[q3_pos];
+    
+    Some((min, q1, median, q3, max))
 }
-

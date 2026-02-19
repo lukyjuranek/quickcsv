@@ -7,9 +7,12 @@ use tabled::{
         merge::Merge, Alignment,formatting::Justification, object::Rows, themes::Colorization, Color}
 };
 mod utils;
-use utils::{column_rows, column_nas, column_mean, column_median, column_std};
+use utils::{column_rows, column_nas, column_mean, column_std, column_quartiles};
 
-fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(), Box<dyn Error>>{
+mod help;
+use help::print_help;
+
+fn create_tables_from_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(), Box<dyn Error>>{
     let file = File::open(filename)?;
     let mut rdr = csv::Reader::from_reader(file);
 
@@ -73,17 +76,18 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
         })
         .collect();
 
-    let medians: Vec<Option<f64>> = (0..headers.len())
-        .map(|col_idx|{
-            column_median(&data_rows, col_idx)
-        })
-        .collect();
-
     let std: Vec<f64> = (0..headers.len())
         .map(|col_idx|{
             column_std(&data_rows, col_idx)
         })
         .collect();
+
+    let quartiles: Vec<Option<(f64, f64, f64, f64, f64)>> = (0..headers.len())
+        .map(|col_idx|{
+            column_quartiles(&data_rows, col_idx)
+        })
+        .collect();
+
 
     let mut stats_builder = tabled::builder::Builder::default();
     
@@ -118,22 +122,74 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
         row
     });
 
-    // Push medians
-    stats_builder.push_record({
-        let mut row = vec!["median".to_string()];
-        row.extend(medians.iter().map(|v| match v{
-            Some(val) => format!("{:.3}",val),
-            None => "-".to_string(),
-        }));
-        row
-    });
-
     // Push standard deviations 
     stats_builder.push_record({
         let mut row = vec!["std".to_string()];
         row.extend(std.iter().map(|v| format!("{:.3}",v)));
         row
     });
+
+    // Push quartiles
+    // Min
+    stats_builder.push_record({
+        let mut row = vec!["min".to_string()];
+        for q in &quartiles {
+            match q {
+                Some((min, _, _, _, _)) => row.push(format!("{:.3}", min)),
+                None => row.push("N/A".to_string()),
+            }
+        }
+        row
+    });
+
+    // Q1
+    stats_builder.push_record({
+        let mut row = vec!["q1".to_string()];
+        for q in &quartiles {
+            match q {
+                Some((_, q1, _, _, _)) => row.push(format!("{:.3}", q1)),
+                None => row.push("N/A".to_string()),
+            }
+        }
+        row
+    });
+
+    // Median
+    stats_builder.push_record({
+        let mut row = vec!["median".to_string()];
+        for q in &quartiles {
+            match q {
+                Some((_, _, median, _, _)) => row.push(format!("{:.3}", median)),
+                None => row.push("N/A".to_string()),
+            }
+        }
+        row
+    });
+
+    // Q3
+    stats_builder.push_record({
+        let mut row = vec!["q3".to_string()];
+        for q in &quartiles {
+            match q {
+                Some((_, _, _, q3, _)) => row.push(format!("{:.3}", q3)),
+                None => row.push("N/A".to_string()),
+            }
+        }
+        row
+    });
+
+    // Max
+    stats_builder.push_record({
+        let mut row = vec!["max".to_string()];
+        for q in &quartiles {
+            match q {
+                Some((_, _, _, _, max)) => row.push(format!("{:.3}", max)),
+                None => row.push("N/A".to_string()),
+            }
+        }
+        row
+    });
+
 
     let stats_table = stats_builder.build()
         .with(Style::modern())
@@ -151,13 +207,25 @@ fn read_csv<P: AsRef<Path>>(filename: P, max_lines: Option<usize>) -> Result<(),
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    // dbg!(&args);
+
+    if args.len() < 2 {
+        eprintln!("Error: No filename provided");
+        eprintln!("Usage: quickcsv <filename> [max_lines]");
+        eprintln!("       quickcsv --help");
+        std::process::exit(1);
+    }
+
+    if args.len() > 1 && args[1] == "--help" {
+        print_help();
+        return Ok(());
+    }
+
     let filename = &args[1];
     let n_lines: Option<usize> = args.get(2)
         .map(|s| s.parse())
         .transpose()?;
 
-    let _ = read_csv(filename,n_lines);
+    let _ = create_tables_from_csv(filename, n_lines);
 
     Ok(())
 }
