@@ -34,8 +34,8 @@ darwin)
 esac
 
 # Set variables
-TOOL_NAME="your_tool_name"
-REPO="yourusername/your_tool_name"
+TOOL_NAME="quickcsv"
+REPO="lukyuranek/quickcsv"
 BINARY_NAME="${TOOL_NAME}-${OS}-${ARCH}"
 INSTALL_DIR="/usr/local/bin"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
