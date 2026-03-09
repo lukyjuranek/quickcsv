@@ -1,3 +1,4 @@
+use textplots::{Chart, Plot, Shape};
 
 pub fn column_rows(rows: &[Vec<String>]) -> usize {
     rows.len()   
@@ -89,4 +90,22 @@ pub fn column_quartiles(rows: &[Vec<String>], col_idx: usize) -> Option<(f64, f6
     let q3 = values[q3_pos];
     
     Some((min, q1, median, q3, max))
+}
+
+pub fn plot_column_distribution(values: &[f64], column_name: &str) {
+    if values.is_empty() {
+        return;
+    }
+    
+    let points: Vec<(f32, f32)> = values
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (i as f32, *v as f32))
+        .collect();
+    
+    println!("\n{}", column_name);
+    
+    Chart::new(80, 30, 0.0, values.len() as f32)
+        .lineplot(&Shape::Lines(&points))
+        .nice();
 }

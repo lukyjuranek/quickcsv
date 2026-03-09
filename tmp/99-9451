@@ -1,0 +1,5 @@
+    let means: Vec<[Option<f64>; 5]> = (0..headers.len())
+        .map(|col_idx|{
+            column_quartiles(&data_rows, col_idx)
+        })
+        .collect();

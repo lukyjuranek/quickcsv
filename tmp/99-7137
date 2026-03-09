@@ -1,0 +1,55 @@
+    // Collect all histogram data first
+    let mut histograms: Vec<(String, Vec<(f32, f32)>)> = Vec::new();
+    
+    for col_idx in 0..headers.len() {
+        let col_data: Vec<f32> = data_rows.iter()
+            .filter_map(|row| row.get(col_idx)?.parse::<f32>().ok())
+            .collect();
+        
+        if !col_data.is_empty() {
+            let hist = histogram(&col_data, 30);
+            if !hist.is_empty() {
+                histograms.push((headers.get(col_idx).unwrap().to_string(), hist));
+            }
+        }
+    }
+    
+    // Display histograms horizontally (2 per row)
+    for chunk in histograms.chunks(2) {
+        let mut lines_left = vec![];
+        let mut lines_right = vec![];
+        
+        // Generate left chart
+        if let Some((name, hist)) = chunk.get(0) {
+            let chart_str = format!("{}", 
+                Chart::new(40, 15, hist.first().unwrap().0, hist.last().unwrap().0)
+                    .lineplot(&Shape::Lines(hist))
+            );
+            lines_left = chart_str.lines().map(|s| s.to_string()).collect();
+            lines_left.insert(0, format!("Histogram: {}", name));
+        }
+        
+        // Generate right chart if exists
+        if let Some((name, hist)) = chunk.get(1) {
+            let chart_str = format!("{}", 
+                Chart::new(40, 15, hist.first().unwrap().0, hist.last().unwrap().0)
+                    .lineplot(&Shape::Lines(hist))
+            );
+            lines_right = chart_str.lines().map(|s| s.to_string()).collect();
+            lines_right.insert(0, format!("Histogram: {}", name));
+        }
+        
+        // Print side by side
+        let max_lines = lines_left.len().max(lines_right.len());
+        for i in 0..max_lines {
+            let left = lines_left.get(i).map(|s| s.as_str()).unwrap_or("");
+            let right = lines_right.get(i).map(|s| s.as_str()).unwrap_or("");
+            
+            if !lines_right.is_empty() {
+                println!("{:<50} {}", left, right);
+            } else {
+                println!("{}", left);
+            }
+        }
+        println!();
+    }

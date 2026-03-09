@@ -1,0 +1,18 @@
+    if args.len() > 1 && args[1] == "--help" {
+        print_help();
+        return Ok(());
+    }
+
+    if args.len() < 2 {
+        eprintln!("Error: No filename provided");
+        eprintln!("Usage: quickcsv <filename> [max_lines]");
+        eprintln!("       quickcsv --help");
+        std::process::exit(1);
+    }
+
+    let filename = &args[1];
+    let n_lines: Option<usize> = args.get(2)
+        .map(|s| s.parse())
+        .transpose()?;
+
+    let _ = create_tables_from_csv(filename, n_lines);

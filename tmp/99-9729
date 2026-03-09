@@ -1,0 +1,11 @@
+    let quartiles: Vec<[Option<f64>; 5]> = (0..headers.len())
+        .map(|col_idx| {
+            [
+                column_median(&data_rows, col_idx), // 0% (min)
+                column_median(&data_rows, col_idx), // 25%
+                column_median(&data_rows, col_idx), // 50% (median)
+                column_median(&data_rows, col_idx), // 65%
+                column_median(&data_rows, col_idx), // 100% (max)
+            ]
+        })
+        .collect();

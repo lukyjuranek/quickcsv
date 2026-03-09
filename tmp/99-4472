@@ -1,0 +1,4 @@
+ Chart::new(32, 20, -10.0, 10.0)
+        .lineplot(&Shape::Lines(Box::new(|x| x.sin() / x)))
+        .display();
+    

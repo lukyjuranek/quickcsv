@@ -1,0 +1,4 @@
+    let first_col: Vec<f32> = data_rows.iter()
+        .filter_map(|row| row.get(0)?.parse::<f32>().ok())
+        .collect();
+    let hist = histogram(&first_col, 30);
